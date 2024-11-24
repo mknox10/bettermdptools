@@ -43,9 +43,9 @@ class RL:
         #   else:
         #       return np.random.randint(len(Q[state]))
         self.select_action = lambda state, Q, epsilon: \
-            np.random.choice(np.arange(len(Q[state]))[np.isclose(Q[state], np.max(Q[state]))]) \
+            (np.random.choice(np.arange(len(Q[state]))[np.isclose(Q[state], np.max(Q[state]))]), 'Exploit') \
             if np.random.random() > epsilon \
-            else np.random.randint(len(Q[state]))
+            else (np.random.randint(len(Q[state])), 'Explore')
 
     @staticmethod
     def decay_schedule(init_value, min_value, decay_ratio, max_steps, log_start=-2, log_base=10):
@@ -153,12 +153,14 @@ class RL:
         pi_track {list}, len(n_episodes):
             Log of complete policy for each episode
         """
+        explore_exploit = []
         if nS is None:
             nS=self.env.observation_space.n
         if nA is None:
             nA=self.env.action_space.n
         pi_track = []
         Q = np.zeros((nS, nA), dtype=np.float64)
+        explored = np.zeros((nS, nA), dtype=np.float64)
         Q_track = np.zeros((n_episodes, nS, nA), dtype=np.float64)
         alphas = RL.decay_schedule(init_alpha,
                                 min_alpha,
@@ -177,7 +179,8 @@ class RL:
             while not done:
                 if self.render:
                     warnings.warn("Occasional render has been deprecated by openAI.  Use test_env.py to render.")
-                action = self.select_action(state, Q, epsilons[e])
+                action, exp = self.select_action(state, Q, epsilons[e])
+                explore_exploit.append(exp)
                 next_state, reward, terminated, truncated, _ = self.env.step(action)
                 if truncated:
                     warnings.warn("Episode was truncated.  TD target value may be incorrect.")
@@ -188,6 +191,7 @@ class RL:
                 td_error = td_target - Q[state][action]
                 Q[state][action] = Q[state][action] + alphas[e] * td_error
                 state = next_state
+                explored[state][action] += 1
             Q_track[e] = Q
             pi_track.append(np.argmax(Q, axis=1))
             self.render = False
@@ -196,7 +200,7 @@ class RL:
         V = np.max(Q, axis=1)
 
         pi = {s: a for s, a in enumerate(np.argmax(Q, axis=1))}
-        return Q, V, pi, Q_track, pi_track
+        return Q, V, pi, Q_track, pi_track, explore_exploit, np.count_nonzero(explored) / explored.size
 
     def sarsa(self,
               nS=None,
@@ -265,12 +269,14 @@ class RL:
         pi_track {list}, len(n_episodes):
             Log of complete policy for each episode
         """
+        explore_exploit = []
         if nS is None:
             nS = self.env.observation_space.n
         if nA is None:
             nA = self.env.action_space.n
         pi_track = []
         Q = np.zeros((nS, nA), dtype=np.float64)
+        explored = np.zeros((nS, nA), dtype=np.float64)
         Q_track = np.zeros((n_episodes, nS, nA), dtype=np.float64)
         alphas = RL.decay_schedule(init_alpha,
                                 min_alpha,
@@ -287,7 +293,7 @@ class RL:
             state, info = self.env.reset()
             done = False
             state = convert_state_obs(state)
-            action = self.select_action(state, Q, epsilons[e])
+            action, exp = self.select_action(state, Q, epsilons[e])
             while not done:
                 if self.render:
                     warnings.warn("Occasional render has been deprecated by openAI.  Use test_env.py to render.")
@@ -297,10 +303,12 @@ class RL:
                 done = terminated or truncated
                 self.callbacks.on_env_step(self)
                 next_state = convert_state_obs(next_state)
-                next_action = self.select_action(next_state, Q, epsilons[e])
+                next_action, exp = self.select_action(next_state, Q, epsilons[e])
+                explore_exploit.append(exp)
                 td_target = reward + gamma * Q[next_state][next_action] * (not done)
                 td_error = td_target - Q[state][action]
                 Q[state][action] = Q[state][action] + alphas[e] * td_error
+                explored[state][action] += 1
                 state, action = next_state, next_action
             Q_track[e] = Q
             pi_track.append(np.argmax(Q, axis=1))
@@ -310,4 +318,4 @@ class RL:
         V = np.max(Q, axis=1)
 
         pi = {s: a for s, a in enumerate(np.argmax(Q, axis=1))}
-        return Q, V, pi, Q_track, pi_track
+        return Q, V, pi, Q_track, pi_track, explore_exploit, np.count_nonzero(explored) / explored.size
