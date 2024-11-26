@@ -310,7 +310,7 @@ class RL:
                 explore_exploit.append(exp)
                 td_target = reward + gamma * Q[next_state][next_action] * (not done)
                 td_error = td_target - Q[state][action]
-                Q[state][action] = Q[state][action] + alphas[e] * td_error,
+                Q[state][action] = Q[state][action] + alphas[e] * td_error
                 visited[state] += 1
                 explored[state][action] += 1
                 state, action = next_state, next_action
