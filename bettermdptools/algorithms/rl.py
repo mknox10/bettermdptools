@@ -161,6 +161,7 @@ class RL:
         pi_track = []
         Q = np.zeros((nS, nA), dtype=np.float64)
         explored = np.zeros((nS, nA), dtype=np.float64)
+        visited = np.zeros(nS, dtype=np.float64)
         Q_track = np.zeros((n_episodes, nS, nA), dtype=np.float64)
         alphas = RL.decay_schedule(init_alpha,
                                 min_alpha,
@@ -192,6 +193,7 @@ class RL:
                 Q[state][action] = Q[state][action] + alphas[e] * td_error
                 state = next_state
                 explored[state][action] += 1
+                visited[state] += 1
             Q_track[e] = Q
             pi_track.append(np.argmax(Q, axis=1))
             self.render = False
@@ -200,7 +202,7 @@ class RL:
         V = np.max(Q, axis=1)
 
         pi = {s: a for s, a in enumerate(np.argmax(Q, axis=1))}
-        return Q, V, pi, Q_track, pi_track, explore_exploit, np.count_nonzero(explored) / explored.size
+        return Q, V, pi, Q_track, pi_track, explore_exploit, np.count_nonzero(explored) / explored.size, visited
 
     def sarsa(self,
               nS=None,
@@ -277,6 +279,7 @@ class RL:
         pi_track = []
         Q = np.zeros((nS, nA), dtype=np.float64)
         explored = np.zeros((nS, nA), dtype=np.float64)
+        visited = np.zeros(nS, dtype=np.float64)
         Q_track = np.zeros((n_episodes, nS, nA), dtype=np.float64)
         alphas = RL.decay_schedule(init_alpha,
                                 min_alpha,
@@ -307,7 +310,8 @@ class RL:
                 explore_exploit.append(exp)
                 td_target = reward + gamma * Q[next_state][next_action] * (not done)
                 td_error = td_target - Q[state][action]
-                Q[state][action] = Q[state][action] + alphas[e] * td_error
+                Q[state][action] = Q[state][action] + alphas[e] * td_error,
+                visited[state] += 1
                 explored[state][action] += 1
                 state, action = next_state, next_action
             Q_track[e] = Q
@@ -318,4 +322,4 @@ class RL:
         V = np.max(Q, axis=1)
 
         pi = {s: a for s, a in enumerate(np.argmax(Q, axis=1))}
-        return Q, V, pi, Q_track, pi_track, explore_exploit, np.count_nonzero(explored) / explored.size
+        return Q, V, pi, Q_track, pi_track, explore_exploit, np.count_nonzero(explored) / explored.size, visited
