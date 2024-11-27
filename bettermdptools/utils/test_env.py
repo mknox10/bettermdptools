@@ -51,6 +51,7 @@ class TestEnv:
             else:
                 env = gym.make(env_name, desc=desc, render_mode='human')
         n_actions = env.action_space.n
+        action_log = []
         test_scores = np.full([n_iters], np.nan)
         for i in range(0, n_iters):
             state, info = env.reset()
@@ -75,6 +76,7 @@ class TestEnv:
                             print("please enter a valid action, 0 - %i \n" % int(n_actions - 1))
                 else:
                     action = pi[state]
+                    action_log.append(action)
                 next_state, reward, terminated, truncated, info = env.step(action)
                 done = terminated or truncated
                 next_state = convert_state_obs(next_state)
@@ -82,4 +84,4 @@ class TestEnv:
                 total_reward = reward + total_reward
             test_scores[i] = total_reward
         env.close()
-        return test_scores
+        return test_scores, action_log
